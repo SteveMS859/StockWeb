@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestion de Stock - Société</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .hidden { display: none; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid black; padding: 8px; text-align: center; }
+        button { padding: 5px 10px; margin: 5px; }
+        input { margin: 5px; padding: 5px; }
+    </style>
+</head>
+<body>
+    <!-- Page de connexion -->
+    <div id="loginPage">
+        <h2>Connexion</h2>
+        <label>Identifiant: </label><input type="text" id="username"><br>
+        <label>Mot de passe: </label><input type="password" id="password"><br>
+        <button onclick="login()">Se connecter</button>
+        <p id="error" style="color: red;"></p>
+    </div>
+
+    <!-- Page utilisateur (gestion stock) -->
+    <div id="userPage" class="hidden">
+        <h2>Stock du bâtiment <span id="batimentName"></span></h2>
+        <table>
+            <thead>
+                <tr><th>Objet</th><th>Quantité</th><th>Action</th></tr>
+            </thead>
+            <tbody id="stockTable"></tbody>
+        </table>
+        <button onclick="logout()">Déconnexion</button>
+    </div>
+
+    <!-- Page admin (vue globale) -->
+    <div id="adminPage" class="hidden">
+        <h2>Vue globale des stocks</h2>
+        <table>
+            <thead id="adminTableHead"></thead>
+            <tbody id="adminTableBody"></tbody>
+        </table>
+        <button onclick="logout()">Déconnexion</button>
+    </div>
+
+    <script>
+        // Données initiales (simule une base de données)
+        const buildings = {
+            "Bat1": { password: "MDP_Bat1", stock: { "Stylo": 50, "Cahier": 20, "Clavier": 10 } },
+            "Bat2": { password: "MDP_Bat2", stock: { "Stylo": 30, "Cahier": 15, "Clavier": 5 } },
+            "Bat3": { password: "MDP_Bat3", stock: { "Stylo": 40, "Cahier": 10, "Clavier": 8 } },
+            "Bat4": { password: "MDP_Bat4", stock: { "Stylo": 20, "Cahier": 25, "Clavier": 15 } },
+            "Bat5": { password: "MDP_Bat5", stock: { "Stylo": 60, "Cahier": 30, "Clavier": 12 } },
+            "Bat6": { password: "MDP_Bat6", stock: { "Stylo": 25, "Cahier": 5, "Clavier": 20 } }
+        };
+        const adminCredentials = { username: "Admin", password: "MDP_Admin" };
+
+        let currentUser = null;
+
+        // Sauvegarde dans localStorage
+        if (!localStorage.getItem("stocks")) {
+            localStorage.setItem("stocks", JSON.stringify(buildings));
+        }
+
+        function login() {
+            const username = document.getElementById("username").value;
+            const password = document.getElementById("password").value;
+            const error = document.getElementById("error");
+            const stocks = JSON.parse(localStorage.getItem("stocks"));
+
+            if (username === adminCredentials.username && password === adminCredentials.password) {
+                currentUser = "Admin";
+                showAdminPage();
+            } else {
+                let found = false;
+                for (let bat in stocks) {
+                    if (username === bat && password === stocks[bat].password) {
+                        currentUser = bat;
+                        showUserPage(bat);
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    error.textContent = "Identifiants incorrects";
+                }
+            }
+        }
+
+        function showUserPage(batiment) {
+            document.getElementById("loginPage").classList.add("hidden");
+            document.getElementById("userPage").classList.remove("hidden");
+            document.getElementById("batimentName").textContent = batiment;
+
+            const stocks = JSON.parse(localStorage.getItem("stocks"));
+            const stock = stocks[batiment].stock;
+            const tableBody = document.getElementById("stockTable");
+            tableBody.innerHTML = "";
+
+            for (let item in stock) {
+                const row = document.createElement("tr");
+                row.innerHTML = `
+                    <td>${item}</td>
+                    <td>${stock[item]}</td>
+                    <td>
+                        <input type="number" id="qty_${item}" min="0" placeholder="Quantité">
+                        <button onclick="updateStock('${batiment}', '${item}', 'add')">Ajouter</button>
+                        <button onclick="updateStock('${batiment}', '${item}', 'remove')">Retirer</button>
+                    </td>`;
+                tableBody.appendChild(row);
+            }
+        }
+
+        function updateStock(batiment, item, action) {
+            const qty = parseInt(document.getElementById(`qty_${item}`).value) || 0;
+            const stocks = JSON.parse(localStorage.getItem("stocks"));
+            if (action === "add") {
+                stocks[batiment].stock[item] += qty;
+            } else if (action === "remove" && stocks[batiment].stock[item] >= qty) {
+                stocks[batiment].stock[item] -= qty;
+            }
+            localStorage.setItem("stocks", JSON.stringify(stocks));
+            showUserPage(batiment);
+        }
+
+        function showAdminPage() {
+            document.getElementById("loginPage").classList.add("hidden");
+            document.getElementById("adminPage").classList.remove("hidden");
+
+            const stocks = JSON.parse(localStorage.getItem("stocks"));
+            const items = ["Stylo", "Cahier", "Clavier"];
+            const head = document.getElementById("adminTableHead");
+            const body = document.getElementById("adminTableBody");
+
+            head.innerHTML = "<tr><th>Bâtiment</th>" + items.map(i => `<th>${i}</th>`).join("") + "</tr>";
+            body.innerHTML = "";
+            for (let bat in stocks) {
+                const row = document.createElement("tr");
+                row.innerHTML = `<td>${bat}</td>` + items.map(i => `<td>${stocks[bat].stock[i]}</td>`).join("");
+                body.appendChild(row);
+            }
+        }
+
+        function logout() {
+            currentUser = null;
+            document.getElementById("loginPage").classList.remove("hidden");
+            document.getElementById("userPage").classList.add("hidden");
+            document.getElementById("adminPage").classList.add("hidden");
+            document.getElementById("username").value = "";
+            document.getElementById("password").value = "";
+            document.getElementById("error").textContent = "";
+        }
+    </script>
+</body>
+</html>
